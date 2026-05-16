@@ -1,0 +1,38 @@
+In SQL, choosing between NOT EXISTS and NOT IN is a classic subquery trap. While they look like they should do the exact same thing, they handle NULL values completely differently.
+
+Here is the breakdown of why NOT IN can silently break your logic and why NOT EXISTS is the safer, more robust choice.
+
+1. The Problem: NOT IN Breaks with NULLs
+When you use NOT IN, SQL translates the operation into a series of AND conditions using the inequality operator (!=).
+
+If the subquery returns even a single NULL value, the entire NOT IN condition evaluates to UNKNOWN (which SQL treats as FALSE). As a result, your query will return zero rows, even if there are perfectly valid matches.
+
+How SQL Sees It Behind the Scenes
+Imagine you want to find users who haven't placed an order. You write:
+SELECT user_id 
+FROM users 
+WHERE user_id NOT IN (SELECT user_id FROM orders);
+
+If the orders table contains the IDs (1, 2, NULL), SQL expands your WHERE clause to look like this:$$user\_id \neq 1 \text{ AND } user\_id \neq 2 \text{ AND } user\_id \neq \text{NULL}$$In SQL, any comparison to NULL (like user_id != NULL) results in UNKNOWN. Because the overall condition uses AND, if one part is UNKNOWN, the whole expression becomes UNKNOWN. Consequently, no rows ever meet the criteria.
+
+2. The Solution: NOT EXISTS is Safe
+NOT EXISTS operates on correlated subqueries and checks for the existence of rows, rather than comparing specific values. It cares about whether the subquery returns any rows at all.
+
+How SQL Sees It Behind the Scenes
+Using the same example with NOT EXISTS:
+
+SELECT u.user_id 
+FROM users u
+WHERE NOT EXISTS (
+    SELECT 1 
+    FROM orders o 
+    WHERE o.user_id = u.user_id
+);
+
+With NOT EXISTS, SQL evaluates the internal join condition (o.user_id = u.user_id).
+
+If o.user_id is NULL, the condition NULL = u.user_id evaluates to UNKNOWN.
+
+Because it's not TRUE, that specific row in orders is simply ignored.
+
+The query moves on to check the rest of the rows. It won't cause the entire query to fail or return empty results.
