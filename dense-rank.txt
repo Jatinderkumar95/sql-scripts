@@ -1,0 +1,57 @@
+Let's solve the highest employee ID problem using the `DENSE_RANK()` window function.
+
+While `ROW_NUMBER()` and `DENSE_RANK()` look very similar, using `DENSE_RANK()` provides an incredibly important safety net when it comes to ties (duplicate values).
+
+---
+
+## The SQL Query
+
+```sql
+WITH RankedEmployees AS (
+    SELECT 
+        empId,
+        first_name,
+        last_name,
+        department,
+        DENSE_RANK() OVER (ORDER BY empId DESC) AS rank_num
+    FROM employee
+)
+SELECT 
+    empId, 
+    first_name, 
+    last_name, 
+    department
+FROM RankedEmployees
+WHERE rank_num = 1;
+
+```
+
+---
+
+## Why use `DENSE_RANK()` instead of `ROW_NUMBER()`?
+
+If your `empId` column is a strict primary key (meaning it is impossible to have duplicate IDs), `ROW_NUMBER()` and `DENSE_RANK()` will give you the exact same result.
+
+**However, if you are ranking by a column that *can* have ties—like finding the highest salary, or the highest test score—`DENSE_RANK()` behaves much more intelligently.**
+
+### The Tie-Breaker Difference:
+
+Imagine you have three employees competing for the top spot:
+
+* Alice: $100k
+* Bob: $100k
+* Charlie: $90k
+
+Here is how the different functions assign numbers when ordering by salary descending:
+
+| Employee | Salary | `ROW_NUMBER()` | `RANK()` | `DENSE_RANK()` |
+| --- | --- | --- | --- | --- |
+| **Alice** | $100k | **1** | **1** | **1** |
+| **Bob** | $100k | 2 *(Randomly chosen)* | **1** | **1** |
+| **Charlie** | $90k | 3 | 3 *(Skips 2)* | 2 *(Dense/No gaps)* |
+
+### Why `DENSE_RANK()` wins for "Highest" queries:
+
+* **`ROW_NUMBER()`** forces a unique number. If Alice and Bob tie for the highest salary, it will arbitrarily pick one to be `1` and the other to be `2`. Your final query (`WHERE row_num = 1`) would completely leave Bob out.
+* **`DENSE_RANK()`** assigns the exact same rank to ties. Both Alice and Bob get a rank of `1`. When you filter by `WHERE rank_num = 1`, **your query safely returns both employees** who share the highest spot.
+* It is called "dense" because it never skips a number. Charlie gets a `2` right after the `1`s, unlike standard `RANK()`, which would skip to `3`.
