@@ -1,0 +1,16 @@
+CREATE FUNCTION public.film_in_stock(p_film_id integer, p_store_id integer, OUT p_film_count integer) RETURNS SETOF integer
+    LANGUAGE sql
+    AS $_$
+     SELECT inventory_id
+     FROM inventory
+     WHERE film_id = $1
+     AND store_id = $2
+     AND inventory_in_stock(inventory_id);
+$_$;
+
+
+1. Output Parameters + Row Sets: The PostgreSQL function does two things at once: it returns a result set of integers (RETURNS SETOF integer) and utilizes an OUT parameter (p_film_count). In SQL Server, a standard User-Defined Function (UDF) cannot return a table/set and use an output parameter simultaneously.
+
+2. The Best Tool for the Job: To perfectly mimic this behavior in SQL Server, we use a Stored Procedure. Stored procedures natively support returning row sets while simultaneously populating @p_film_count as an OUTPUT parameter.
+
+
