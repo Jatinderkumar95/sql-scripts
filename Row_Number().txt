@@ -66,3 +66,14 @@ WHERE row_num = 1;
 * `PARTITION BY department` tells SQL to chop the table into mini-groups based on the department name.
 * `ROW_NUMBER()` resets back to `1` for every single department.
 * Filtering by `WHERE row_num = 1` will now return the highest employee ID for *every* department instead of just one overall winner.
+
+What if there is a tie? (The Hidden Trap)
+What happens if you ORDER BY department and 50 employees are all in the "Sales" department?
+
+SQL will group all the Sales employees together, but because there is no secondary instruction on how to sort within Sales, SQL will assign the numbers 1 through 50 randomly among those 50 employees.
+
+If you run that query tomorrow, Employee X might be row 4, and the next day they might be row 12. To fix this and ensure the numbers never change, you can pass multiple columns into the window function:
+
+SQL
+ROW_NUMBER() OVER (ORDER BY department ASC, empId DESC)
+Now, SQL sorts by department first. If there's a tie, it breaks the tie using the empId from highest to lowest.
