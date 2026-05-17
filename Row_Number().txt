@@ -1,0 +1,68 @@
+To find the employee with the highest `empId` using the `ROW_NUMBER()` window function, you can pair it with a **Common Table Expression (CTE)** or a subquery.
+
+Because `ROW_NUMBER()` is a window function, it cannot be used directly in a `WHERE` clause. You have to assign the row numbers first in an inner query, and then filter them in an outer query.
+
+Here is how to do it step-by-step.
+
+---
+
+## The SQL Query
+
+```sql
+WITH RankedEmployees AS (
+    SELECT 
+        empId,
+        first_name,
+        last_name,
+        department,
+        ROW_NUMBER() OVER (ORDER BY empId DESC) AS row_num
+    FROM employee
+)
+SELECT 
+    empId, 
+    first_name, 
+    last_name, 
+    department
+FROM RankedEmployees
+WHERE row_num = 1;
+
+```
+
+---
+
+## How It Works
+
+1. **The `OVER (ORDER BY empId DESC)` Clause:** This tells SQL to sort the entire table by `empId` in descending order (highest to lowest).
+2. **The `ROW_NUMBER()` Function:** This sequentially numbers the sorted rows starting from 1. Because we sorted from highest to lowest, the absolute highest `empId` will automatically get a `row_num` of `1`.
+3. **The CTE (`WITH RankedEmployees AS ...`):** This temporarily stores the table with its newly created `row_num` column.
+4. **The Outer `WHERE row_num = 1` Clause:** This filters the temporary table to pull *only* the very first row, giving you the employee with the highest ID.
+
+---
+
+## Alternative: Finding the Highest `empId` *Per Department*
+
+If your goal is actually to find the highest employee ID within **each specific department**, you can easily modify the query by adding `PARTITION BY`:
+
+```sql
+WITH RankedEmployees AS (
+    SELECT 
+        empId,
+        first_name,
+        department,
+        ROW_NUMBER() OVER (PARTITION BY department ORDER BY empId DESC) AS row_num
+    FROM employee
+)
+SELECT 
+    empId, 
+    first_name, 
+    department
+FROM RankedEmployees
+WHERE row_num = 1;
+
+```
+
+### What changes?
+
+* `PARTITION BY department` tells SQL to chop the table into mini-groups based on the department name.
+* `ROW_NUMBER()` resets back to `1` for every single department.
+* Filtering by `WHERE row_num = 1` will now return the highest employee ID for *every* department instead of just one overall winner.
