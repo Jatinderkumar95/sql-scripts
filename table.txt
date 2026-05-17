@@ -1,0 +1,6 @@
+CREATE TABLE dbo.inventory (
+    inventory_id integer DEFAULT nextval('public.inventory_inventory_id_seq'::regclass) NOT NULL,
+    film_id smallint NOT NULL,
+    store_id smallint NOT NULL,
+    last_update timestamp with time zone DEFAULT now() NOT NULL
+);
