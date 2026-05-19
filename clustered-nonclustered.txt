@@ -1,0 +1,62 @@
+That paragraph gives a great high-level overview, but things get really interesting when you zoom into the actual architecture of how a database stores this under the hood.
+
+To understand **leaf pages**, **data pages**, and **index pages**, it helps to think of a clustered index as a highly organized book. Let's break down exactly what these components are and how they interact.
+
+---
+
+### The Base Unit: What is a "Page"?
+
+In databases like SQL Server, a **page** is the fundamental unit of data storage.
+
+* It is a fixed size (usually **8 KB**).
+* Databases don't read or write data row-by-row from disk; they read and write entire 8 KB pages into memory (RAM).
+* A single page contains a header (system info), the actual rows of data, and a row offset table at the end (which helps the system find exactly where a row starts inside that page).
+
+---
+
+### The B-Tree Structure: Index Pages vs. Leaf Pages
+
+When you create a clustered index, the database organizes these 8 KB pages into a tree structure called a **B-Tree** (Balanced Tree). This tree has three layers: the Root, the Intermediate levels, and the Leaf level.
+
+```
+                   [ Root Page ]          <-- Index Page
+                     /       \
+         [ Index Page ]     [ Index Page ] <-- Index Pages
+           /        \         /        \
+     [Leaf Page] [Leaf Page] [Leaf Page] [Leaf Page] <-- Leaf / Data Pages
+     (Row 1-10)  (Row 11-20) (Row 21-30) (Row 31-40)
+         ^------------^---------^---------^     <-- Doubly Linked List
+
+```
+
+#### 1. Index Pages (The Map)
+
+The top and middle layers of the tree consist of **Index Pages** (also called non-leaf pages).
+
+* **What they hold:** They do *not* contain your actual table data (like names, dates, or prices). They only hold the index key (e.g., `EmployeeID`) and a pointer to the page on the level below it.
+* **Their Job:** They act purely as a navigation system. If you are looking for `EmployeeID = 25`, the root index page says, *"IDs 1 through 50 are down the left path."* You follow the pointers down until you hit the bottom.
+
+#### 2. Leaf Pages / Data Pages (The Content)
+
+The bottom layer of the tree consists of the **Leaf Pages**.
+
+* **What they hold:** In a *clustered index*, **the leaf pages and the data pages are the exact same thing.** They contain the actual, full rows of your table.
+* **Their Job:** This is where your data lives permanently, ordered physically by your index key.
+* **The Linked List:** Every leaf page is physically linked to the page before it and after it (a doubly linked list). This is why clustered indexes are lightning-fast for range scans (e.g., `WHERE ID BETWEEN 10 AND 50`). The database finds page 10 using the index pages, and then just walks straight across the leaf pages horizontally without having to go back up the tree.
+
+---
+
+### Why Updates Can Be "Expensive" (Page Splits)
+
+Your excerpt mentioned that updates can be expensive. Here is the exact physical reason why: **Page Splits**.
+
+Imagine a leaf page is full of data rows (remember, it only has 8 KB of space). Because it's a clustered index, the data *must* remain in sequential order.
+
+If you try to insert a new row that logically belongs right in the middle of that full page, the database can't just squeeze it in. Instead, it has to perform a page split:
+
+1. It allocates a brand-new, empty 8 KB page.
+2. It moves roughly half of the rows from the full page to the new page to make room.
+3. It inserts your new row into its proper sequential spot.
+4. It goes back up to the **Index Pages** to update the pointers so the navigation map stays accurate.
+
+This requires heavy disk I/O and CPU, which is why choosing a sequential, ever-increasing value (like an `IDENTITY` auto-incrementing integer or a sequential GUID) is the gold standard for a clustered index key—it ensures new data is always cleanly appended to the very end, preventing those messy middle-page splits.
